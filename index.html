@@ -91,18 +91,21 @@ function load() { try { const s = JSON.parse(localStorage.getItem(KEY)); if (s) 
 function save() { try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) {} }
 function answered() { return Object.keys(state.answers).length; }
 
-function pull(name) {
-  return new Promise(resolve => {
-    if (!ENDPOINT.startsWith("http")) return resolve(null);
-    const fn = "jp" + Date.now();
-    const s = document.createElement("script");
-    const done = v => { delete window[fn]; s.remove(); resolve(v); };
-    window[fn] = v => done(v);
-    s.onerror = () => done(null);
-    s.src = ENDPOINT + "?annotator=" + encodeURIComponent(name) + "&callback=" + fn;
-    document.body.appendChild(s);
-    setTimeout(() => { if (window[fn]) done(null); }, 15000);
-  });
+async function pull(name) {
+  if (!ENDPOINT.startsWith("http")) return null;
+  const ctl = new AbortController();
+  const timer = setTimeout(() => ctl.abort(), 20000);
+  try {
+    const t = await fetch(ENDPOINT + "?annotator=" + encodeURIComponent(name) + "&callback=cb",
+                          { signal:ctl.signal }).then(r => r.text());
+    const a = t.indexOf("("), b = t.lastIndexOf(")");
+    if (a < 0 || b <= a) return null;
+    return JSON.parse(t.slice(a + 1, b));
+  } catch (e) {
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 function post(row) {
