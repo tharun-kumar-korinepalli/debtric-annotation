@@ -37,7 +37,6 @@ button[disabled] { opacity:.4; cursor:default; }
 button[disabled]:hover { border-color:var(--line); }
 .row.nav { margin-top:16px; padding-top:14px; border-top:1px solid var(--line); }
 .prev { font-size:14px; color:var(--mut); margin:14px 0 0; }
-label.chk { display:flex; align-items:center; gap:8px; font-size:14px; color:var(--mut); margin:14px 0 0; cursor:pointer; }
 input[type=text] { font:inherit; padding:10px 12px; border:1px solid var(--line); border-radius:8px;
   width:100%; max-width:320px; }
 .note { font-size:13px; color:var(--mut); margin-top:16px; }
@@ -97,10 +96,9 @@ function nextUnanswered() {
 }
 function answered() { return Object.keys(state.answers).length; }
 function esc(s) { return String(s).replace(/[&<>]/g, c => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;" })[c]); }
-function answer(label, pairBad) {
+function answer(label) {
   const item = DATA[idx];
-  const row = { annotator:state.name, id:item.id, label:label,
-                pair_contradictory: pairBad ? 1 : 0, at:new Date().toISOString() };
+  const row = { annotator:state.name, id:item.id, label:label, at:new Date().toISOString() };
   state.answers[item.id] = row;
   save(); post(row);
   go(idx + 1);
@@ -142,7 +140,7 @@ function intro() {
         <li><b>Conflict</b> means no single situation makes all three true.</li>
         <li><b>No conflict</b> means at least one situation makes all three true.</li>
         <li>Treat every statement as true and use only what the statements say. Do not add outside knowledge.</li>
-        <li>A conflict here needs all three. If two statements already clash on their own, tick the box for that.</li>
+        <li>A conflict here needs all three. Each statement should look fine alone, and any two should look fine together.</li>
         <li>There are only two answers. If you click the wrong one, press Back and change it.</li>
       </ul>
     </div>
@@ -202,8 +200,6 @@ function render() {
         <button class="pri${prev && prev.label === "conflict" ? " sel" : ""}" id="c">Conflict, they cannot</button>
         <button class="pri${prev && prev.label === "no_conflict" ? " sel" : ""}" id="n">No conflict, they can</button>
       </div>
-      <label class="chk"><input type="checkbox" id="p"${prev && prev.pair_contradictory ? " checked" : ""}>
-        Two of them already clash, without the third</label>
       ${prev ? `<p class="prev">You answered <b>${prev.label === "conflict" ? "Conflict" : "No conflict"}</b>.
         Press the other button to change it.</p>` : ""}
       <div class="row nav">
@@ -218,9 +214,8 @@ function render() {
       to understand what a word, a table or a piece of code means, and then decide yourself.
     </div>
     `;
-  const pb = () => document.getElementById("p").checked;
-  document.getElementById("c").onclick = () => answer("conflict", pb());
-  document.getElementById("n").onclick = () => answer("no_conflict", pb());
+  document.getElementById("c").onclick = () => answer("conflict");
+  document.getElementById("n").onclick = () => answer("no_conflict");
   document.getElementById("bk").onclick = () => go(idx - 1);
   document.getElementById("fw").onclick = () => go(idx + 1);
   document.getElementById("rev").onclick = e => { e.preventDefault(); intro(); };
