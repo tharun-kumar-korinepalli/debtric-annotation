@@ -170,6 +170,19 @@ function intro() {
   document.getElementById("app").innerHTML = `
     <h1>Three-way conflict annotation</h1>
     <p class="sub">Please read this page once before you start. It takes two minutes.</p>
+    <div class="name">
+      <b>Use your first name, in small letters, every single time.</b>
+      Your progress is found by that name, so if you start on a laptop and carry on later on a phone,
+      type exactly the same name and the page picks up where you stopped. A different spelling counts
+      as a different person and starts from the beginning.
+    </div>
+    <div class="card">
+      <p class="q">Your first name, small letters only</p>
+      <input type="text" id="nm" placeholder="anna" autocomplete="off" autocapitalize="off" spellcheck="false">
+      <div class="row" style="margin-top:14px"><button class="pri" id="go">Start annotating</button></div>
+      <p class="note" id="st"></p>
+    </div>
+    <h2>What you are deciding</h2>
     <div class="rules">
       You will see three statements at a time, taken from documents such as rules, specifications,
       guidelines, tables and code. Decide whether <b>all three can be true at the same time</b>.
@@ -182,20 +195,8 @@ function intro() {
       </ul>
     </div>
     ${warnHtml()}
-    <div class="name">
-      <b>Use your first name, in small letters, every single time.</b>
-      Your progress is found by that name, so if you start on a laptop and carry on later on a phone,
-      type exactly the same name and the page picks up where you stopped. A different spelling counts
-      as a different person and starts from the beginning.
-    </div>
     <h2>Three worked examples</h2>
-    ${EXAMPLES.map((e, i) => exampleHtml(e, i + 1)).join("")}
-    <div class="card">
-      <p class="q">Your first name, small letters only</p>
-      <input type="text" id="nm" placeholder="anna" autocomplete="off" autocapitalize="off" spellcheck="false">
-      <div class="row" style="margin-top:14px"><button class="pri" id="go">Start annotating</button></div>
-      <p class="note" id="st"></p>
-    </div>`;
+    ${EXAMPLES.map((e, i) => exampleHtml(e, i + 1)).join("")}`;
   const nm = document.getElementById("nm");
   nm.value = state.name || "";
   nm.oninput = () => { nm.value = clean(nm.value); };
