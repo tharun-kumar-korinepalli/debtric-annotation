@@ -108,23 +108,17 @@ async function pull(name) {
   }
 }
 
-function post(row, tries) {
+function post(row) {
   if (!ENDPOINT.startsWith("http")) return;
-  tries = tries || 0;
-  fetch(ENDPOINT, { method:"POST",
+  fetch(ENDPOINT, { method:"POST", mode:"no-cors",
     headers:{ "Content-Type":"text/plain;charset=utf-8" }, body:JSON.stringify(row) })
-    .then(r => r.text())
-    .then(t => { if (t.indexOf("ok") < 0) throw new Error("bad reply"); mark(true); })
-    .catch(() => {
-      if (tries < 4) setTimeout(() => post(row, tries + 1), 1500 * (tries + 1));
-      else mark(false);
-    });
+    .then(() => mark(true)).catch(() => mark(false));
 }
 
 function mark(ok) {
   const el = document.getElementById("sync");
   if (!el) return;
-  el.textContent = ok ? "saved" : "not saved yet, keep this page open";
+  el.textContent = ok ? "saved" : "saved on this device only";
   el.className = ok ? "" : "bad";
 }
 function nextUnanswered() {
