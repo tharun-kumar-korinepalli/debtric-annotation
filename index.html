@@ -43,10 +43,20 @@ input[type=text] { font:inherit; padding:10px 12px; border:1px solid var(--line)
 .rules { background:#fff; border:1px solid var(--line); border-radius:10px; padding:18px 22px; margin-bottom:22px; }
 .rules ul { margin:10px 0 0; padding-left:20px; }
 .rules li { margin:6px 0; }
-.done { text-align:center; padding:52px 20px; }
 .warn { background:#fdf6ed; border:1px solid #e8d4b0; border-radius:10px; padding:16px 20px;
   margin-bottom:22px; font-size:15px; }
 .warn b { color:#8a5a1c; }
+.name { background:#eef3f8; border:1px solid #cddbe8; border-radius:10px; padding:16px 20px;
+  margin-bottom:22px; font-size:15px; }
+.name b { color:var(--acc); }
+details.ex { background:#fff; border:1px solid var(--line); border-radius:10px; margin-bottom:16px; }
+details.ex > summary { cursor:pointer; padding:14px 20px; font-size:15px; color:var(--acc); list-style:none; }
+details.ex > summary::-webkit-details-marker { display:none; }
+details.ex > summary::before { content:"\25B8 "; }
+details[open].ex > summary::before { content:"\25BE "; }
+details.ex .body { padding:0 20px 8px; }
+details.ex .card { box-shadow:none; }
+.done { text-align:center; padding:52px 20px; }
 #sync { font-size:12px; color:var(--mut); }
 #sync.bad { color:var(--bad); }
 </style>
@@ -55,7 +65,7 @@ input[type=text] { font:inherit; padding:10px 12px; border:1px solid var(--line)
 <div class="wrap" id="app"></div>
 <script>
 const ENDPOINT = "https://script.google.com/macros/s/AKfycbyuQfBKqxTaQbx3XgfBTYH3yJiIeBCFdRrfHLPz8jkm6zqqoUD0NuggyGn2vHfVtKJQ/exec";
-const KEY = "debtric_annot_v2";
+const KEY = "debtric_annot_v3";
 let DATA = [], state = { name:"", answers:{} }, idx = 0;
 
 const EXAMPLES = [
@@ -76,8 +86,25 @@ const EXAMPLES = [
     why:"The same three statements as the first example with one word changed, <i>number</i> to <i>string</i>. Now the declared type is in the allowed list, so all three hold together and there is no conflict. One word is often all that separates the two answers, so read the detail." }
 ];
 
+function clean(v) { return String(v || "").toLowerCase().replace(/[^a-z]/g, ""); }
 function load() { try { const s = JSON.parse(localStorage.getItem(KEY)); if (s) state = s; } catch (e) {} }
 function save() { try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) {} }
+function answered() { return Object.keys(state.answers).length; }
+
+function pull(name) {
+  return new Promise(resolve => {
+    if (!ENDPOINT.startsWith("http")) return resolve(null);
+    const fn = "jp" + Date.now();
+    const s = document.createElement("script");
+    const done = v => { delete window[fn]; s.remove(); resolve(v); };
+    window[fn] = v => done(v);
+    s.onerror = () => done(null);
+    s.src = ENDPOINT + "?annotator=" + encodeURIComponent(name) + "&callback=" + fn;
+    document.body.appendChild(s);
+    setTimeout(() => { if (window[fn]) done(null); }, 15000);
+  });
+}
+
 function post(row) {
   if (!ENDPOINT.startsWith("http")) return;
   fetch(ENDPOINT, { method:"POST", mode:"no-cors",
@@ -94,7 +121,6 @@ function nextUnanswered() {
   for (let i = 0; i < DATA.length; i++) if (!state.answers[DATA[i].id]) return i;
   return DATA.length;
 }
-function answered() { return Object.keys(state.answers).length; }
 function esc(s) { return String(s).replace(/[&<>]/g, c => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;" })[c]); }
 function answer(label) {
   const item = DATA[idx];
@@ -115,7 +141,7 @@ function download() {
   const blob = new Blob([rows.map(r => JSON.stringify(r)).join("\n")], { type:"application/x-ndjson" });
   const a = document.createElement("a");
   a.href = URL.createObjectURL(blob);
-  a.download = "annotations_" + (state.name || "anon").replace(/\W+/g, "_") + ".jsonl";
+  a.download = "annotations_" + (state.name || "anon") + ".jsonl";
   a.click();
 }
 function exampleHtml(e, i) {
@@ -128,6 +154,13 @@ function exampleHtml(e, i) {
     <div class="stmt"><b>Statement 3</b>${esc(e.s3)}</div>
     <div class="verdict">Example ${i}: ${tag}.<br>${e.why}</div>
   </div>`;
+}
+function warnHtml() {
+  return `<div class="warn">
+      <b>Please do not use ChatGPT, Claude or any other AI tool to decide the answer.</b>
+      The judgement has to be yours. If a statement is not clear to you, you may use an AI tool
+      to understand what a word, a table or a piece of code means, and then decide yourself.
+    </div>`;
 }
 function intro() {
   document.getElementById("app").innerHTML = `
@@ -144,25 +177,42 @@ function intro() {
         <li>There are only two answers. If you click the wrong one, press Back and change it.</li>
       </ul>
     </div>
-    <div class="warn">
-      <b>Please do not use ChatGPT, Claude or any other AI tool to decide the answer.</b>
-      The judgement has to be yours. If a statement is not clear to you, you may use an AI tool
-      to understand what a word, a table or a piece of code means, and then decide yourself.
+    ${warnHtml()}
+    <div class="name">
+      <b>Use your first name, in small letters, every single time.</b>
+      Your progress is found by that name, so if you start on a laptop and carry on later on a phone,
+      type exactly the same name and the page picks up where you stopped. A different spelling counts
+      as a different person and starts from the beginning.
     </div>
     <h2>Three worked examples</h2>
     ${EXAMPLES.map((e, i) => exampleHtml(e, i + 1)).join("")}
     <div class="card">
-      <p class="q">Your name or initials</p>
-      <input type="text" id="nm" placeholder="Your name" autocomplete="off">
+      <p class="q">Your first name, small letters only</p>
+      <input type="text" id="nm" placeholder="anna" autocomplete="off" autocapitalize="off" spellcheck="false">
       <div class="row" style="margin-top:14px"><button class="pri" id="go">Start annotating</button></div>
+      <p class="note" id="st"></p>
     </div>`;
-  const go = () => {
-    const v = document.getElementById("nm").value.trim();
+  const nm = document.getElementById("nm");
+  nm.value = state.name || "";
+  nm.oninput = () => { nm.value = clean(nm.value); };
+  const start = async () => {
+    const v = clean(nm.value);
     if (!v) return;
-    state.name = v; save(); idx = nextUnanswered(); window.scrollTo(0, 0); render();
+    document.getElementById("st").textContent = "looking up your progress, one moment";
+    document.getElementById("go").disabled = true;
+    const server = await pull(v);
+    if (state.name && state.name !== v) state.answers = {};
+    state.name = v;
+    if (server) {
+      for (const id in server) {
+        if (!state.answers[id]) state.answers[id] = { annotator:v, id:id, label:server[id], at:"" };
+      }
+    }
+    save();
+    go(nextUnanswered());
   };
-  document.getElementById("go").onclick = go;
-  document.getElementById("nm").onkeydown = e => { if (e.key === "Enter") go(); };
+  document.getElementById("go").onclick = start;
+  nm.onkeydown = e => { if (e.key === "Enter") start(); };
 }
 function render() {
   const app = document.getElementById("app");
@@ -185,8 +235,7 @@ function render() {
   const prev = state.answers[it.id];
   app.innerHTML = `
     <h1>Three-way conflict annotation</h1>
-    <p class="sub">${esc(state.name)} &middot; <span id="sync">ready</span> &middot;
-      <a href="#" id="rev">see the examples again</a></p>
+    <p class="sub">${esc(state.name)} &middot; <span id="sync">ready</span></p>
     <div class="bar"><i style="width:${(n / DATA.length * 100).toFixed(1)}%"></i></div>
     <div class="meta"><span>${n} of ${DATA.length} answered</span><span>item ${idx + 1} of ${DATA.length}</span></div>
     <div class="card">
@@ -208,26 +257,38 @@ function render() {
       </div>
       <p class="note">Your place is kept if you close the page, open the same link to carry on.</p>
     </div>
-    <div class="warn">
-      <b>Please do not use ChatGPT, Claude or any other AI tool to decide the answer.</b>
-      The judgement has to be yours. If a statement is not clear to you, you may use an AI tool
-      to understand what a word, a table or a piece of code means, and then decide yourself.
-    </div>
-    `;
+    <details class="ex">
+      <summary>Show the three worked examples</summary>
+      <div class="body">${EXAMPLES.map((e, i) => exampleHtml(e, i + 1)).join("")}</div>
+    </details>
+    ${warnHtml()}`;
   document.getElementById("c").onclick = () => answer("conflict");
   document.getElementById("n").onclick = () => answer("no_conflict");
   document.getElementById("bk").onclick = () => go(idx - 1);
   document.getElementById("fw").onclick = () => go(idx + 1);
-  document.getElementById("rev").onclick = e => { e.preventDefault(); intro(); };
 }
-load();
-fetch("samples.json")
-  .then(r => r.json())
-  .then(d => { DATA = d; idx = nextUnanswered(); render(); })
-  .catch(() => {
-    document.getElementById("app").innerHTML =
-      "<h1>Could not load samples.json</h1><p class='sub'>The data file is missing next to this page.</p>";
-  });
+async function boot() {
+  load();
+  const app = document.getElementById("app");
+  app.innerHTML = "<h1>Three-way conflict annotation</h1><p class='sub'>Loading, one moment.</p>";
+  try {
+    DATA = await fetch("samples.json").then(r => r.json());
+  } catch (e) {
+    app.innerHTML = "<h1>Could not load samples.json</h1><p class='sub'>The data file is missing next to this page.</p>";
+    return;
+  }
+  if (state.name) {
+    const server = await pull(state.name);
+    if (server) {
+      for (const id in server) {
+        if (!state.answers[id]) state.answers[id] = { annotator:state.name, id:id, label:server[id], at:"" };
+      }
+      save();
+    }
+  }
+  go(nextUnanswered());
+}
+boot();
 </script>
 </body>
 </html>
